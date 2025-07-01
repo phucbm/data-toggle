@@ -1,6 +1,6 @@
 {
   "name": "@phucbm/data-toggle",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Toggle class in elements via [data-toggle='class-name']",
   "type": "module",
   "main": "dist/index.js",
