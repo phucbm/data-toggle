@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@phucbm/banner':
-        specifier: ^0.0.1
-        version: 0.0.1
+        specifier: ^0.0.2
+        version: 0.0.2
       '@types/jest':
         specifier: ^29.5.14
         version: 29.5.14
@@ -444,8 +444,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.28':
     resolution: {integrity: sha512-KNNHHwW3EIp4EDYOvYFGyIFfx36R2dNJYH4knnZlF8T5jdbD5Wx8xmSaQ2gP9URkJ04LGEtlcCtwArKcmFcwKw==}
 
-  '@phucbm/banner@0.0.1':
-    resolution: {integrity: sha512-n7dV95hMWeMaANyqDI2dIMaQ9lDQPQEPh1p5Jvk96RfTCNACnQJACa3uDz1lQr89n+fsnh8DrQD+M9JpXYmZ+Q==}
+  '@phucbm/banner@0.0.2':
+    resolution: {integrity: sha512-rgs5Q+dpnuHLXl4hK/rQkpaOoxX7EIwIIlRu8iTHX1am3pkI/7U1hbOeA7Q626bZgnk3MPJMOXsx4AByC/4fbg==}
     engines: {node: '>=16'}
 
   '@pkgjs/parseargs@0.11.0':
@@ -2407,7 +2407,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.3
 
-  '@phucbm/banner@0.0.1': {}
+  '@phucbm/banner@0.0.2': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
