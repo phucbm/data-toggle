@@ -1,5 +1,3 @@
-import _ from 'lodash';
-
 interface DataToggleConfig {
     /** CSS selector for toggle elements. Defaults to '[data-toggle]' */
     selector?: string;
@@ -69,6 +67,27 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
     };
 
     /**
+     * Simple debounce implementation
+     */
+    const debounce = (func: Function, delay: number) => {
+        let timeoutId: number;
+        return (event: Event) => {
+            // Preserve the event and target for later use
+            const target = event.currentTarget as Element;
+            const preservedEvent = {
+                ...event,
+                currentTarget: target,
+                preventDefault: () => event.preventDefault()
+            };
+
+            clearTimeout(timeoutId);
+            timeoutId = window.setTimeout(() => {
+                func(preservedEvent);
+            }, delay);
+        };
+    };
+
+    /**
      * Validate that required elements exist
      */
     const validateElements = (): boolean => {
@@ -114,6 +133,11 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
         if (isDestroyed) return;
 
         const target = event.currentTarget as Element;
+        if (!target) {
+            log('No current target found in event');
+            return;
+        }
+
         const className = target.getAttribute(options.toggleAttribute);
 
         if (!className?.trim()) {
@@ -171,7 +195,7 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
             }
 
             const clickHandler = options.debounceDelay > 0
-                ? _.debounce(handleToggleClick, options.debounceDelay)
+                ? debounce(handleToggleClick, options.debounceDelay)
                 : handleToggleClick;
 
             toggleElements.forEach(element => {
