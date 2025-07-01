@@ -1,5 +1,5 @@
 /*!
- * @phucbm/data-toggle 0.0.2
+ * @phucbm/data-toggle 0.0.3
  * https://github.com/phucbm/data-toggle
  *
  * @license MIT
