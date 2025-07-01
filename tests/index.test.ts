@@ -1,14 +1,5 @@
 import {createDataToggle} from '../src';
 
-// Mock lodash debounce
-jest.mock('lodash', () => ({
-    debounce: jest.fn((fn) => {
-        const debouncedFn = (...args: any[]) => fn(...args);
-        debouncedFn.cancel = jest.fn();
-        return debouncedFn;
-    })
-}));
-
 describe('createDataToggle', () => {
     // Clean up DOM and console after each test
     afterEach(() => {
@@ -355,17 +346,30 @@ describe('createDataToggle', () => {
             toggle.destroy();
         });
 
-        test('should use lodash debounce when debounceDelay is set', () => {
-            const mockDebounce = require('lodash').debounce;
-
+        test('should use internal debounce when debounceDelay is set', (done) => {
             document.body.innerHTML = `
         <button data-toggle="debounced">Toggle</button>
       `;
 
-            createDataToggle({debounceDelay: 100});
+            const toggle = createDataToggle({debounceDelay: 50});
+            const button = document.querySelector('[data-toggle]') as HTMLElement;
 
-            expect(mockDebounce).toHaveBeenCalledWith(expect.any(Function), 100);
-        });
+            // Click multiple times rapidly
+            button.click();
+            button.click();
+            button.click();
+
+            // Should not toggle immediately due to debouncing
+            expect(document.documentElement.classList.contains('debounced')).toBe(false);
+
+            // Wait for debounce delay + some buffer
+            setTimeout(() => {
+                // Should toggle only once after debounce delay
+                expect(document.documentElement.classList.contains('debounced')).toBe(true);
+                toggle.destroy();
+                done();
+            }, 100);
+        }, 10000); // Increase timeout to 10 seconds
     });
 
     describe('Instance management', () => {

@@ -11,10 +11,11 @@ export default defineConfig([
         target: 'es2020',
         platform: 'node',
         bundle: true,
-        minify: false,
+        minify: true,
         sourcemap: true,
         dts: true,
         clean: true,
+        treeshake: true,
         outExtension: () => ({js: '.js'}),
         banner: {js: generateBanner()},
         onSuccess: async () => {
