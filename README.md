@@ -10,7 +10,7 @@ A lightweight, flexible TypeScript utility for toggling CSS classes via data att
 
 ## Features
 
-✨ **Zero dependencies** (except lodash for debouncing)  
+✨ **Zero dependencies** - fully self-contained  
 🎯 **Framework agnostic** - works with any JavaScript framework or vanilla JS  
 🔧 **Flexible targeting** - toggle classes on any element via selectors  
 📱 **Smart defaults** - auto-prevents default for links and buttons  
@@ -35,6 +35,9 @@ pnpm add @phucbm/data-toggle
 ```html
 <!-- Toggle class on <html> element -->
 <button data-toggle="dark-mode">Toggle Dark Mode</button>
+
+<!-- Toggle multiple classes at once (comma-separated) -->
+<button data-toggle="dark-mode,sidebar-open">Toggle Dark Mode + Sidebar</button>
 
 <!-- Toggle class on specific element -->
 <button data-toggle="sidebar-open" data-toggle-element=".sidebar">Toggle Sidebar</button>
@@ -85,6 +88,7 @@ const toggle = createDataToggle({
 // Toggle classes programmatically
 toggle.toggle('dark-mode'); // Toggle on default target
 toggle.toggle('sidebar-open', '.sidebar'); // Toggle on specific element
+toggle.toggle('dark-mode,nav-hidden'); // Toggle multiple classes at once
 
 // Check if classes are active
 if (toggle.isActive('dark-mode')) {
@@ -94,6 +98,11 @@ if (toggle.isActive('dark-mode')) {
 // Check specific elements
 if (toggle.isActive('sidebar-open', '.sidebar')) {
   console.log('Sidebar is open');
+}
+
+// isActive returns true only if ALL specified classes are active
+if (toggle.isActive('dark-mode,nav-hidden')) {
+  console.log('Both classes are active');
 }
 
 // Refresh after DOM changes
@@ -109,14 +118,14 @@ toggle.destroy(); // Removes all event listeners
 ```typescript
 // Listen for toggle events
 document.addEventListener('datatoggle', (event) => {
-  const { className, target, trigger, active } = event.detail;
+  const { classNames, target, trigger, active } = event.detail;
   
-  console.log(`Class "${className}" was ${active ? 'added' : 'removed'}`);
+  console.log(`Classes "${classNames.join(', ')}" were ${active ? 'added' : 'removed'}`);
   console.log('Target element:', target);
   console.log('Trigger element:', trigger);
   
   // Example: Save theme preference
-  if (className === 'dark-mode') {
+  if (classNames.includes('dark-mode')) {
     localStorage.setItem('theme', active ? 'dark' : 'light');
   }
 });
@@ -183,7 +192,7 @@ document.addEventListener('datatoggle', (event) => {
 const toggle = createDataToggle();
 
 document.addEventListener('datatoggle', (e) => {
-  if (e.detail.className === 'sidebar-open') {
+  if (e.detail.classNames.includes('sidebar-open')) {
     // Lock body scroll when sidebar opens
     document.body.style.overflow = e.detail.active ? 'hidden' : '';
   }
@@ -201,7 +210,7 @@ Creates a new data toggle instance.
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `selector` | `string` | `'[data-toggle]'` | CSS selector for toggle elements |
-| `toggleAttribute` | `string` | `'data-toggle'` | Attribute containing the class name |
+| `toggleAttribute` | `string` | `'data-toggle'` | Attribute containing the class name(s), comma-separated |
 | `elementAttribute` | `string` | `'data-toggle-element'` | Attribute containing target selector |
 | `defaultTarget` | `Element` | `document.documentElement` | Default element to toggle classes on |
 | `defaultElementSelector` | `string` | `''` | Fallback selector for targets |
@@ -224,10 +233,10 @@ The library dispatches `datatoggle` events with the following detail:
 
 ```typescript
 {
-  className: string;    // The toggled class name
+  classNames: string[]; // Array of toggled class names
   target: Element;      // Element that received the class
   trigger: Element;     // Button/element that was clicked (null for programmatic)
-  active: boolean;      // Whether class was added (true) or removed (false)
+  active: boolean;      // Whether classes were added (true) or removed (false)
 }
 ```
 

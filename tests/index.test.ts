@@ -256,7 +256,7 @@ describe('createDataToggle', () => {
             expect(eventListener).toHaveBeenCalledWith(
                 expect.objectContaining({
                     detail: expect.objectContaining({
-                        className: 'event-test',
+                        classNames: ['event-test'],
                         target: document.documentElement,
                         trigger: button,
                         active: true
@@ -278,7 +278,7 @@ describe('createDataToggle', () => {
             expect(eventListener).toHaveBeenCalledWith(
                 expect.objectContaining({
                     detail: expect.objectContaining({
-                        className: 'programmatic',
+                        classNames: ['programmatic'],
                         target: document.documentElement,
                         trigger: null, // No trigger for programmatic
                         active: true
