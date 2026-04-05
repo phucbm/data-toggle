@@ -19,9 +19,9 @@ interface DataToggleConfig {
 interface DataToggleInstance {
     /** Destroy the toggle instance and remove ALL event listeners for this instance */
     destroy(): void;
-    /** Programmatically toggle a class on specific element by its data-toggle value */
+    /** Programmatically toggle one or more classes (comma-separated) on a specific element */
     toggle(className: string, elementSelector?: string): void;
-    /** Check if a class is currently active for a specific data-toggle element */
+    /** Check if one or more classes (comma-separated) are all currently active */
     isActive(className: string, elementSelector?: string): boolean;
     /** Refresh the instance - use when DOM changes and new [data-toggle] elements are added */
     refresh(): void;

@@ -21,10 +21,10 @@ interface DataToggleInstance {
     /** Destroy the toggle instance and remove ALL event listeners for this instance */
     destroy(): void;
 
-    /** Programmatically toggle a class on specific element by its data-toggle value */
+    /** Programmatically toggle one or more classes (comma-separated) on a specific element */
     toggle(className: string, elementSelector?: string): void;
 
-    /** Check if a class is currently active for a specific data-toggle element */
+    /** Check if one or more classes (comma-separated) are all currently active */
     isActive(className: string, elementSelector?: string): boolean;
 
     /** Refresh the instance - use when DOM changes and new [data-toggle] elements are added */
@@ -138,12 +138,14 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
             return;
         }
 
-        const className = target.getAttribute(options.toggleAttribute);
+        const rawValue = target.getAttribute(options.toggleAttribute);
 
-        if (!className?.trim()) {
+        if (!rawValue?.trim()) {
             log(`No class name found in ${options.toggleAttribute} attribute`);
             return;
         }
+
+        const classNames = rawValue.split(',').map(c => c.trim()).filter(Boolean);
 
         // Determine if we should prevent default
         let shouldPreventDefault = options.preventDefault;
@@ -162,16 +164,16 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
             return;
         }
 
-        // Perform the toggle
-        const wasActive = toggleTarget.classList.contains(className);
-        toggleTarget.classList.toggle(className);
+        // Perform the toggle - all classes toggled together based on first class state
+        const wasActive = toggleTarget.classList.contains(classNames[0]);
+        classNames.forEach(cls => toggleTarget.classList.toggle(cls, !wasActive));
 
-        log(`Toggled class "${className}" on`, toggleTarget, wasActive ? 'OFF' : 'ON');
+        log(`Toggled classes "${classNames.join(', ')}" on`, toggleTarget, wasActive ? 'OFF' : 'ON');
 
         // Dispatch custom event
         const toggleEvent = new CustomEvent('datatoggle', {
             detail: {
-                className,
+                classNames,
                 target: toggleTarget,
                 trigger: target,
                 active: !wasActive
@@ -262,6 +264,8 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
                 return;
             }
 
+            const classNames = className.split(',').map(c => c.trim()).filter(Boolean);
+
             let targetElement: Element;
 
             if (elementSelector) {
@@ -277,15 +281,15 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
                 targetElement = options.defaultTarget;
             }
 
-            const wasActive = targetElement.classList.contains(className);
-            targetElement.classList.toggle(className);
+            const wasActive = targetElement.classList.contains(classNames[0]);
+            classNames.forEach(cls => targetElement.classList.toggle(cls, !wasActive));
 
-            log(`Programmatically toggled "${className}" on`, targetElement, wasActive ? 'OFF' : 'ON');
+            log(`Programmatically toggled "${classNames.join(', ')}" on`, targetElement, wasActive ? 'OFF' : 'ON');
 
             // Dispatch custom event
             const toggleEvent = new CustomEvent('datatoggle', {
                 detail: {
-                    className,
+                    classNames,
                     target: targetElement,
                     trigger: null, // No trigger for programmatic toggles
                     active: !wasActive
@@ -299,6 +303,8 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
                 console.warn('[DataToggle] Cannot check state on destroyed instance');
                 return false;
             }
+
+            const classNames = className.split(',').map(c => c.trim()).filter(Boolean);
 
             let targetElement: Element;
 
@@ -315,7 +321,8 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
                 targetElement = options.defaultTarget;
             }
 
-            return targetElement.classList.contains(className);
+            // Returns true only if ALL classes are active
+            return classNames.every(cls => targetElement.classList.contains(cls));
         },
 
         refresh() {
