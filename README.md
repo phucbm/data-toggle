@@ -16,6 +16,7 @@ A lightweight, flexible TypeScript utility for toggling CSS classes via data att
 📱 **Smart defaults** - auto-prevents default for links and buttons  
 🎪 **Event-driven** - dispatches custom events for easy integration  
 ⚡ **Debounced clicks** - built-in debouncing support  
+♿ **Accessible** - optional `aria-expanded` / `aria-controls` sync and Escape to close  
 🔄 **Multiple instances** - create separate instances with different configurations  
 🛡️ **TypeScript** - fully typed for better DX  
 
@@ -89,6 +90,7 @@ const toggle = createDataToggle({
 toggle.toggle('dark-mode'); // Toggle on default target
 toggle.toggle('sidebar-open', '.sidebar'); // Toggle on specific element
 toggle.toggle('dark-mode,nav-hidden'); // Toggle multiple classes at once
+toggle.toggle('menu-open', undefined, false); // Force off (true forces on), e.g. close the menu on resize
 
 // Check if classes are active
 if (toggle.isActive('dark-mode')) {
@@ -148,15 +150,23 @@ document.addEventListener('datatoggle', (event) => {
 ```
 
 ### Mobile Menu
-```html
-<button data-toggle="menu-open" data-toggle-element=".mobile-menu">
-  ☰ Menu
-</button>
+One class on `<html>`, any number of triggers: the hamburger, a close button, the backdrop.
 
-<nav class="mobile-menu">
+```html
+<button data-toggle="menu-open" data-toggle-escape aria-label="Menu">☰</button>
+
+<nav id="mobile-menu" class="mobile-menu">
+  <button data-toggle="menu-open">Close</button>
   <a href="/">Home</a>
   <a href="/about">About</a>
 </nav>
+<div class="backdrop" data-toggle="menu-open" aria-hidden="true"></div>
+```
+
+```typescript
+createDataToggle({aria: true});
+// Every button/link with data-toggle="menu-open" gets aria-expanded="true|false";
+// Escape closes it (data-toggle-escape on the trigger, or escape: true for all).
 ```
 
 ```css
@@ -165,7 +175,7 @@ document.addEventListener('datatoggle', (event) => {
   transition: transform 0.3s ease;
 }
 
-.mobile-menu.menu-open {
+.menu-open .mobile-menu {
   transform: translateX(0);
 }
 ```
@@ -217,13 +227,16 @@ Creates a new data toggle instance.
 | `preventDefault` | `boolean \| 'auto'` | `'auto'` | Prevent default click behavior |
 | `debug` | `boolean` | `false` | Enable debug logging |
 | `debounceDelay` | `number` | `0` | Debounce delay in milliseconds |
+| `aria` | `boolean` | `false` | Keep `aria-expanded` on button and link triggers (`<a>`, `<button>`, any `[role]`) in step with their classes, on load and after every change. Adds `aria-controls` when `data-toggle-element` points to an element with an id (an existing `aria-controls` is kept) |
+| `escape` | `boolean` | `false` | The Escape key turns off every active toggle |
+| `escapeAttribute` | `string` | `'data-toggle-escape'` | Per-trigger Escape setting: present (or `"true"`) closes on Escape, `"false"` never does; it wins over `escape` |
 
 **Instance Methods:**
 
 | Method | Description |
 |--------|-------------|
 | `destroy()` | Remove all event listeners for this instance |
-| `toggle(className, elementSelector?)` | Programmatically toggle a class |
+| `toggle(className, elementSelector?, force?)` | Programmatically toggle a class; `force` `true` adds, `false` removes (no event when nothing changes) |
 | `isActive(className, elementSelector?)` | Check if a class is currently active |
 | `refresh()` | Re-scan DOM for new toggle elements |
 
@@ -235,8 +248,9 @@ The library dispatches `datatoggle` events with the following detail:
 {
   classNames: string[]; // Array of toggled class names
   target: Element;      // Element that received the class
-  trigger: Element;     // Button/element that was clicked (null for programmatic)
+  trigger: Element | null; // Element that was clicked, or whose classes Escape closed (null for toggle())
   active: boolean;      // Whether classes were added (true) or removed (false)
+  source: 'click' | 'api' | 'escape'; // What changed them
 }
 ```
 
@@ -271,9 +285,17 @@ pnpm test
 # Build the package
 pnpm run build
 
+# Type-check src and tests
+pnpm typecheck
+
 # Run tests in watch mode
 pnpm run test:watch
 ```
+
+## Release
+Releases are published to npm by `.github/workflows/publish.yml` with [npm trusted publishing](https://docs.npmjs.com/trusted-publishers) (OIDC): no npm token is stored anywhere.
+
+Publish a GitHub release with a tag like `v1.2.3`. The workflow runs the tests, builds, sets `package.json` to that version, commits the build back to `main` and publishes to npm. The trusted publisher on npmjs.com names the workflow `publish.yml`.
 
 ## License
 

@@ -10,10 +10,11 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "declaration": true,
     "sourceMap": true,
     "isolatedModules": true,
+    "types": ["jest", "node"],
     "lib": [
       "ES2020",
       "DOM",
@@ -23,9 +24,7 @@
   "include": [
     "src/**/*",
     "tests/**/*",
-    "tsup.config.ts",
-    "node_modules/.pnpm/@types+node@24.0.8/node_modules/@types/node/globals.d.ts",
-    "node_modules/.pnpm/@types+node@24.0.8/node_modules/@types/node/globals.d.ts"
+    "tsup.config.ts"
   ],
   "exclude": [
     "node_modules",

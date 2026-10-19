@@ -15,14 +15,32 @@ interface DataToggleConfig {
     debug?: boolean;
     /** Debounce delay in milliseconds. Defaults to 0 (no debouncing) */
     debounceDelay?: number;
+    /** Keep aria-expanded (and aria-controls) on button and link triggers in step with their classes. Defaults to false */
+    aria?: boolean;
+    /** Close active toggles with the Escape key. Per trigger: data-toggle-escape / data-toggle-escape="false". Defaults to false */
+    escape?: boolean;
+    /** Data attribute name for the per-trigger Escape setting. Defaults to 'data-toggle-escape' */
+    escapeAttribute?: string;
+}
+
+/** What changed the classes: a click on a trigger, the toggle() method, or the Escape key */
+type DataToggleSource = 'click' | 'api' | 'escape';
+
+interface DataToggleEventDetail {
+    classNames: string[];
+    target: Element;
+    /** Trigger that was clicked, or whose classes Escape closed; null for toggle() */
+    trigger: Element | null;
+    active: boolean;
+    source: DataToggleSource;
 }
 
 interface DataToggleInstance {
     /** Destroy the toggle instance and remove ALL event listeners for this instance */
     destroy(): void;
 
-    /** Programmatically toggle one or more classes (comma-separated) on a specific element */
-    toggle(className: string, elementSelector?: string): void;
+    /** Programmatically toggle one or more classes (comma-separated) on a specific element; force true adds, false removes */
+    toggle(className: string, elementSelector?: string, force?: boolean): void;
 
     /** Check if one or more classes (comma-separated) are all currently active */
     isActive(className: string, elementSelector?: string): boolean;
@@ -36,6 +54,8 @@ interface DataToggleInstance {
  * @param config - Configuration options
  * @returns DataToggleInstance with control methods
  */
+export type {DataToggleConfig, DataToggleInstance, DataToggleEventDetail, DataToggleSource};
+
 export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInstance => {
     const options: Required<DataToggleConfig> = {
         selector: '[data-toggle]',
@@ -46,6 +66,9 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
         preventDefault: 'auto',
         debug: false,
         debounceDelay: 0,
+        aria: false,
+        escape: false,
+        escapeAttribute: 'data-toggle-escape',
         ...config
     };
 
@@ -126,6 +149,92 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
         return options.defaultTarget;
     };
 
+    const parseClassNames = (value: string | null): string[] =>
+        (value || '').split(',').map(c => c.trim()).filter(Boolean);
+
+    /**
+     * Target of a trigger without warnings, for state checks (aria, Escape)
+     */
+    const quietTarget = (toggleElement: Element): Element | null => {
+        const elementSelector = toggleElement.getAttribute(options.elementAttribute);
+        if (elementSelector) return document.querySelector(elementSelector);
+        if (options.defaultElementSelector) {
+            const defaultElement = document.querySelector(options.defaultElementSelector);
+            if (defaultElement) return defaultElement;
+        }
+        return options.defaultTarget;
+    };
+
+    /**
+     * aria-expanded only belongs on interactive triggers: a backdrop <div> gets none
+     */
+    const canHaveAria = (element: Element): boolean =>
+        element.tagName === 'BUTTON' || element.tagName === 'A' || element.hasAttribute('role');
+
+    /**
+     * Set aria-expanded on every trigger from its target's classes, and aria-controls when the target has an id
+     */
+    const syncAria = () => {
+        if (!options.aria) return;
+        document.querySelectorAll(options.selector).forEach(trigger => {
+            if (!canHaveAria(trigger)) return;
+            const classNames = parseClassNames(trigger.getAttribute(options.toggleAttribute));
+            const target = quietTarget(trigger);
+            if (!classNames.length || !target) return;
+
+            const expanded = classNames.every(cls => target.classList.contains(cls));
+            trigger.setAttribute('aria-expanded', String(expanded));
+            if (target.id && trigger.hasAttribute(options.elementAttribute) && !trigger.hasAttribute('aria-controls')) {
+                trigger.setAttribute('aria-controls', target.id);
+            }
+        });
+    };
+
+    /**
+     * Set the classes on or off together, then sync aria and dispatch the datatoggle event
+     */
+    const apply = (classNames: string[], target: Element, active: boolean, trigger: Element | null, source: DataToggleSource) => {
+        classNames.forEach(cls => target.classList.toggle(cls, active));
+        log(`${source}: classes "${classNames.join(', ')}" on`, target, active ? 'ON' : 'OFF');
+        syncAria();
+
+        const detail: DataToggleEventDetail = {classNames, target, trigger, active, source};
+        document.dispatchEvent(new CustomEvent('datatoggle', {detail}));
+    };
+
+    /**
+     * Whether Escape closes this trigger's classes: its own attribute first, then the escape option
+     */
+    const closesOnEscape = (trigger: Element): boolean => {
+        const value = trigger.getAttribute(options.escapeAttribute);
+        if (value === null) return options.escape;
+        return value !== 'false';
+    };
+
+    /**
+     * Escape: turn off every active toggle that allows it, once per target and classes
+     */
+    const handleKeydown = (event: KeyboardEvent) => {
+        if (isDestroyed || event.key !== 'Escape') return;
+
+        const done = new Map<Element, Set<string>>();
+        document.querySelectorAll(options.selector).forEach(trigger => {
+            if (!closesOnEscape(trigger)) return;
+            const classNames = parseClassNames(trigger.getAttribute(options.toggleAttribute));
+            const target = quietTarget(trigger);
+            if (!classNames.length || !target) return;
+            if (!classNames.every(cls => target.classList.contains(cls))) return;
+
+            const key = classNames.join(',');
+            const keys = done.get(target) || new Set<string>();
+            if (keys.has(key)) return;
+            keys.add(key);
+            done.set(target, keys);
+
+            apply(classNames, target, false, trigger, 'escape');
+        });
+    };
+
     /**
      * Handle toggle click events
      */
@@ -145,7 +254,7 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
             return;
         }
 
-        const classNames = rawValue.split(',').map(c => c.trim()).filter(Boolean);
+        const classNames = parseClassNames(rawValue);
 
         // Determine if we should prevent default
         let shouldPreventDefault = options.preventDefault;
@@ -166,20 +275,7 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
 
         // Perform the toggle - all classes toggled together based on first class state
         const wasActive = toggleTarget.classList.contains(classNames[0]);
-        classNames.forEach(cls => toggleTarget.classList.toggle(cls, !wasActive));
-
-        log(`Toggled classes "${classNames.join(', ')}" on`, toggleTarget, wasActive ? 'OFF' : 'ON');
-
-        // Dispatch custom event
-        const toggleEvent = new CustomEvent('datatoggle', {
-            detail: {
-                classNames,
-                target: toggleTarget,
-                trigger: target,
-                active: !wasActive
-            }
-        });
-        document.dispatchEvent(toggleEvent);
+        apply(classNames, toggleTarget, !wasActive, target, 'click');
     };
 
     /**
@@ -213,6 +309,7 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
             });
 
             log(`Bound events to ${toggleElements.length} elements`);
+            syncAria();
         } catch (error) {
             console.error('[DataToggle] Error binding events:', error);
         }
@@ -239,6 +336,7 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
 
     // Initialize
     bindEvents();
+    document.addEventListener('keydown', handleKeydown);
 
     // Return the instance API
     return {
@@ -249,11 +347,12 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
             }
 
             unbindEvents(); // Removes ALL event listeners for this instance
+            document.removeEventListener('keydown', handleKeydown);
             isDestroyed = true;
             log('Instance destroyed - all event listeners removed');
         },
 
-        toggle(className: string, elementSelector?: string) {
+        toggle(className: string, elementSelector?: string, force?: boolean) {
             if (isDestroyed) {
                 console.warn('[DataToggle] Cannot toggle on destroyed instance');
                 return;
@@ -264,7 +363,7 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
                 return;
             }
 
-            const classNames = className.split(',').map(c => c.trim()).filter(Boolean);
+            const classNames = parseClassNames(className);
 
             let targetElement: Element;
 
@@ -282,20 +381,14 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
             }
 
             const wasActive = targetElement.classList.contains(classNames[0]);
-            classNames.forEach(cls => targetElement.classList.toggle(cls, !wasActive));
+            const active = force === undefined ? !wasActive : force;
 
-            log(`Programmatically toggled "${classNames.join(', ')}" on`, targetElement, wasActive ? 'OFF' : 'ON');
+            // force with nothing to change: no event
+            if (force !== undefined && classNames.every(cls => targetElement.classList.contains(cls) === force)) {
+                return;
+            }
 
-            // Dispatch custom event
-            const toggleEvent = new CustomEvent('datatoggle', {
-                detail: {
-                    classNames,
-                    target: targetElement,
-                    trigger: null, // No trigger for programmatic toggles
-                    active: !wasActive
-                }
-            });
-            document.dispatchEvent(toggleEvent);
+            apply(classNames, targetElement, active, null, 'api');
         },
 
         isActive(className: string, elementSelector?: string): boolean {
@@ -304,7 +397,7 @@ export const createDataToggle = (config: DataToggleConfig = {}): DataToggleInsta
                 return false;
             }
 
-            const classNames = className.split(',').map(c => c.trim()).filter(Boolean);
+            const classNames = parseClassNames(className);
 
             let targetElement: Element;
 
