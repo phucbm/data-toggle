@@ -512,4 +512,231 @@ describe('createDataToggle', () => {
             toggle.destroy();
         });
     });
+
+    describe('aria option', () => {
+        const press = (key: string) => document.dispatchEvent(new KeyboardEvent('keydown', {key}));
+
+        test('should not touch aria attributes by default', () => {
+            document.body.innerHTML = `<button data-toggle="menu-open">Menu</button>`;
+            const toggle = createDataToggle();
+            const button = document.querySelector('button') as HTMLElement;
+
+            button.click();
+            expect(button.hasAttribute('aria-expanded')).toBe(false);
+
+            toggle.destroy();
+        });
+
+        test('should set aria-expanded on load and keep every trigger of the same class in step', () => {
+            document.body.innerHTML = `
+        <button id="open" data-toggle="menu-open">Menu</button>
+        <a id="close" href="#" data-toggle="menu-open">Close</a>
+        <div id="backdrop" data-toggle="menu-open" aria-hidden="true"></div>
+      `;
+            const toggle = createDataToggle({aria: true});
+            const open = document.getElementById('open') as HTMLElement;
+            const close = document.getElementById('close') as HTMLElement;
+            const backdrop = document.getElementById('backdrop') as HTMLElement;
+
+            expect(open.getAttribute('aria-expanded')).toBe('false');
+            expect(close.getAttribute('aria-expanded')).toBe('false');
+
+            open.click();
+            expect(open.getAttribute('aria-expanded')).toBe('true');
+            expect(close.getAttribute('aria-expanded')).toBe('true');
+
+            backdrop.click();
+            expect(open.getAttribute('aria-expanded')).toBe('false');
+            // A plain div is not a control: no aria-expanded on it
+            expect(backdrop.hasAttribute('aria-expanded')).toBe(false);
+
+            toggle.destroy();
+        });
+
+        test('should read multi-class triggers as expanded only when all classes are on', () => {
+            document.body.innerHTML = `
+        <button id="both" data-toggle="menu-open,is-prevent-scroll">Menu</button>
+        <button id="one" data-toggle="is-prevent-scroll">Lock</button>
+      `;
+            const toggle = createDataToggle({aria: true});
+            const both = document.getElementById('both') as HTMLElement;
+            const one = document.getElementById('one') as HTMLElement;
+
+            one.click();
+            expect(one.getAttribute('aria-expanded')).toBe('true');
+            expect(both.getAttribute('aria-expanded')).toBe('false');
+
+            toggle.destroy();
+        });
+
+        test('should set aria-controls from a target with an id, and keep one already written', () => {
+            document.body.innerHTML = `
+        <button id="a" data-toggle="open" data-toggle-element="#panel">A</button>
+        <button id="b" data-toggle="open" data-toggle-element="#panel" aria-controls="custom">B</button>
+        <button id="c" data-toggle="open" data-toggle-element=".no-id">C</button>
+        <div id="panel"></div>
+        <div class="no-id"></div>
+      `;
+            const toggle = createDataToggle({aria: true});
+
+            expect(document.getElementById('a')!.getAttribute('aria-controls')).toBe('panel');
+            expect(document.getElementById('b')!.getAttribute('aria-controls')).toBe('custom');
+            expect(document.getElementById('c')!.hasAttribute('aria-controls')).toBe(false);
+
+            toggle.destroy();
+        });
+
+        test('should sync aria after programmatic toggles and Escape', () => {
+            document.body.innerHTML = `<button data-toggle="menu-open" data-toggle-escape>Menu</button>`;
+            const toggle = createDataToggle({aria: true});
+            const button = document.querySelector('button') as HTMLElement;
+
+            toggle.toggle('menu-open');
+            expect(button.getAttribute('aria-expanded')).toBe('true');
+
+            press('Escape');
+            expect(button.getAttribute('aria-expanded')).toBe('false');
+
+            toggle.destroy();
+        });
+    });
+
+    describe('escape option', () => {
+        const press = (key: string) => document.dispatchEvent(new KeyboardEvent('keydown', {key}));
+
+        test('should not close on Escape by default', () => {
+            document.body.innerHTML = `<button data-toggle="menu-open">Menu</button>`;
+            const toggle = createDataToggle();
+            (document.querySelector('button') as HTMLElement).click();
+
+            press('Escape');
+            expect(document.documentElement.classList.contains('menu-open')).toBe(true);
+
+            toggle.destroy();
+        });
+
+        test('should close every active toggle on Escape when enabled, and ignore other keys', () => {
+            document.body.innerHTML = `
+        <button id="menu" data-toggle="menu-open,is-prevent-scroll">Menu</button>
+        <button id="search" data-toggle="search-open" data-toggle-element="#search-panel">Search</button>
+        <div id="search-panel"></div>
+      `;
+            const toggle = createDataToggle({escape: true});
+            (document.getElementById('menu') as HTMLElement).click();
+            (document.getElementById('search') as HTMLElement).click();
+
+            press('Enter');
+            expect(document.documentElement.classList.contains('menu-open')).toBe(true);
+
+            press('Escape');
+            expect(document.documentElement.classList.contains('menu-open')).toBe(false);
+            expect(document.documentElement.classList.contains('is-prevent-scroll')).toBe(false);
+            expect(document.getElementById('search-panel')!.classList.contains('search-open')).toBe(false);
+
+            toggle.destroy();
+        });
+
+        test('should follow data-toggle-escape per trigger', () => {
+            document.body.innerHTML = `
+        <button id="menu" data-toggle="menu-open" data-toggle-escape>Menu</button>
+        <button id="dark" data-toggle="dark-mode">Dark</button>
+        <button id="keep" data-toggle="keep-open" data-toggle-escape="false">Keep</button>
+      `;
+            const toggle = createDataToggle();
+            ['menu', 'dark', 'keep'].forEach(id => (document.getElementById(id) as HTMLElement).click());
+
+            press('Escape');
+            const html = document.documentElement.classList;
+            expect(html.contains('menu-open')).toBe(false);
+            expect(html.contains('dark-mode')).toBe(true);
+            expect(html.contains('keep-open')).toBe(true);
+            toggle.destroy();
+
+            // data-toggle-escape="false" wins over the global option
+            const global = createDataToggle({escape: true});
+            press('Escape');
+            expect(html.contains('keep-open')).toBe(true);
+            expect(html.contains('dark-mode')).toBe(false);
+            global.destroy();
+        });
+
+        test('should dispatch one escape event per target and classes', () => {
+            document.body.innerHTML = `
+        <button id="open" data-toggle="menu-open">Menu</button>
+        <button id="close" data-toggle="menu-open">Close</button>
+      `;
+            const toggle = createDataToggle({escape: true});
+            (document.getElementById('open') as HTMLElement).click();
+
+            const listener = jest.fn();
+            document.addEventListener('datatoggle', listener);
+            press('Escape');
+            document.removeEventListener('datatoggle', listener);
+
+            expect(listener).toHaveBeenCalledTimes(1);
+            const detail = (listener.mock.calls[0][0] as CustomEvent).detail;
+            expect(detail.source).toBe('escape');
+            expect(detail.active).toBe(false);
+            expect(detail.classNames).toEqual(['menu-open']);
+
+            toggle.destroy();
+        });
+
+        test('should stop listening for Escape after destroy', () => {
+            document.body.innerHTML = `<button data-toggle="menu-open">Menu</button>`;
+            const toggle = createDataToggle({escape: true});
+            (document.querySelector('button') as HTMLElement).click();
+            toggle.destroy();
+
+            press('Escape');
+            expect(document.documentElement.classList.contains('menu-open')).toBe(true);
+        });
+    });
+
+    describe('toggle() force and event source', () => {
+        test('should add with force true and remove with force false', () => {
+            const toggle = createDataToggle();
+
+            toggle.toggle('menu-open', undefined, true);
+            toggle.toggle('menu-open', undefined, true);
+            expect(document.documentElement.classList.contains('menu-open')).toBe(true);
+
+            toggle.toggle('menu-open', undefined, false);
+            expect(document.documentElement.classList.contains('menu-open')).toBe(false);
+
+            toggle.destroy();
+        });
+
+        test('should not dispatch when force changes nothing', () => {
+            const toggle = createDataToggle();
+            const listener = jest.fn();
+            document.addEventListener('datatoggle', listener);
+
+            toggle.toggle('menu-open', undefined, false);
+            expect(listener).not.toHaveBeenCalled();
+
+            toggle.toggle('menu-open', undefined, true);
+            expect(listener).toHaveBeenCalledTimes(1);
+
+            document.removeEventListener('datatoggle', listener);
+            toggle.destroy();
+        });
+
+        test('should tell click from api in the event detail', () => {
+            document.body.innerHTML = `<button data-toggle="menu-open">Menu</button>`;
+            const toggle = createDataToggle();
+            const sources: string[] = [];
+            const listener = (e: Event) => sources.push((e as CustomEvent).detail.source);
+            document.addEventListener('datatoggle', listener);
+
+            (document.querySelector('button') as HTMLElement).click();
+            toggle.toggle('menu-open');
+
+            document.removeEventListener('datatoggle', listener);
+            expect(sources).toEqual(['click', 'api']);
+
+            toggle.destroy();
+        });
+    });
 });
+
